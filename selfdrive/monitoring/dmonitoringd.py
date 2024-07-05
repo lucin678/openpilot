@@ -1,53 +1,42 @@
 #!/usr/bin/env python3
 import gc
+import time
 
 import cereal.messaging as messaging
+from openpilot.common.realtime import set_realtime_priority, DT_DMON
 from openpilot.common.params import Params
-from openpilot.common.realtime import set_realtime_priority
-from openpilot.selfdrive.monitoring.helpers import DriverMonitoring
+from openpilot.selfdrive.controls.lib.events import Events
 
 
-def dmonitoringd_thread():
+def dmonitoringd_thread(sm=None, pm=None):
+  Params().put_bool("DmModelInitialized", True)
   gc.disable()
   set_realtime_priority(2)
 
-  params = Params()
-  pm = messaging.PubMaster(['driverMonitoringState', 'driverMonitoringStateSP'])
-  sm = messaging.SubMaster(['driverStateV2', 'liveCalibration', 'carState', 'controlsState', 'modelV2'], poll='driverStateV2')
+  if pm is None:
+    pm = messaging.PubMaster(['driverStateV2', 'driverMonitoringState'])
 
-  DM = DriverMonitoring(rhd_saved=params.get_bool("IsRhdDetected"), always_on=params.get_bool("AlwaysOnDM"), hands_on_wheel_monitoring=params.get_bool("HandsOnWheelMonitoring"))
-
-  # 20Hz <- dmonitoringmodeld
+  # 10Hz <- dmonitoringmodeld
   while True:
-    sm.update()
-    if not sm.updated['driverStateV2']:
-      # iterate when model has new output
-      continue
+    dat = messaging.new_message('driverStateV2')
+    dat.driverStateV2.leftDriverData.faceOrientation = [0., 0., 0.]
+    dat.driverStateV2.leftDriverData.faceProb = 1.0
+    dat.driverStateV2.rightDriverData.faceOrientation = [0., 0., 0.]
+    dat.driverStateV2.rightDriverData.faceProb = 1.0
+    pm.send('driverStateV2', dat)
 
-    valid = sm.all_checks()
-    if valid:
-      DM.run_step(sm)
-
-    # publish
-    dat = DM.get_state_packet(valid=valid)
+    # dmonitoringd output
+    dat = messaging.new_message('driverMonitoringState', valid=True)
+    dat.driverMonitoringState = {
+      "faceDetected": True,
+      "isDistracted": False,
+      "awarenessStatus": 1.,
+    }
     pm.send('driverMonitoringState', dat)
+    time.sleep(DT_DMON)
 
-    sp_dat = DM.get_sp_state_packet(valid=valid)
-    pm.send('driverMonitoringStateSP', sp_dat)
-
-    # load live always-on toggle
-    if sm['driverStateV2'].frameId % 40 == 1:
-      DM.always_on = params.get_bool("AlwaysOnDM")
-      DM.hands_on_wheel_monitoring = params.get_bool("HandsOnWheelMonitoring")
-
-    # save rhd virtual toggle every 5 mins
-    if (sm['driverStateV2'].frameId % 6000 == 0 and
-     DM.wheelpos_learner.filtered_stat.n > DM.settings._WHEELPOS_FILTER_MIN_COUNT and
-     DM.wheel_on_right == (DM.wheelpos_learner.filtered_stat.M > DM.settings._WHEELPOS_THRESHOLD)):
-      params.put_bool_nonblocking("IsRhdDetected", DM.wheel_on_right)
-
-def main():
-  dmonitoringd_thread()
+def main(sm=None, pm=None):
+  dmonitoringd_thread(sm, pm)
 
 
 if __name__ == '__main__':
