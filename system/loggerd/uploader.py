@@ -227,6 +227,7 @@ class Uploader:
 
 
 def main(exit_event: threading.Event = None) -> None:
+  return
   if exit_event is None:
     exit_event = threading.Event()
 
