@@ -129,7 +129,7 @@ def main():
   cloudlog.warning(f"connected with buffer size: {vipc_client.buffer_len}")
 
   sm = SubMaster(["liveCalibration"])
-  pm = PubMaster(["driverStateV2"])
+  #pm = PubMaster(["driverStateV2"])
 
   calib = np.zeros(CALIB_LEN, dtype=np.float32)
   # last = 0
@@ -147,7 +147,7 @@ def main():
     model_output, dsp_execution_time = model.run(buf, calib)
     t2 = time.perf_counter()
 
-    pm.send("driverStateV2", get_driverstate_packet(model_output, vipc_client.frame_id, vipc_client.timestamp_sof, t2 - t1, dsp_execution_time))
+    #pm.send("driverStateV2", get_driverstate_packet(model_output, vipc_client.frame_id, vipc_client.timestamp_sof, t2 - t1, dsp_execution_time))
     # print("dmonitoring process: %.2fms, from last %.2fms\n" % (t2 - t1, t1 - last))
     # last = t1
 
