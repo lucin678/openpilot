@@ -213,6 +213,7 @@ class Uploader:
 
 
   def step(self, network_type: int, metered: bool) -> bool | None:
+    return True
     d = self.next_file_to_upload(metered)
     if d is None:
       return None
@@ -227,7 +228,7 @@ class Uploader:
 
 
 def main(exit_event: threading.Event = None) -> None:
-  return
+  # return
   if exit_event is None:
     exit_event = threading.Event()
 
